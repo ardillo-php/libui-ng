@@ -125,13 +125,14 @@ Kotlin | [kotlin-libui](https://github.com/msink/kotlin-libui)
 Lua | [libuilua](https://github.com/zevv/libuilua), [libui-lua](https://github.com/mdombroski/libui-lua), [lui](http://tset.de/lui/index.html), [lui](https://github.com/zhaozg/lui)
 Nim | [ui](https://github.com/nim-lang/ui), [uing](https://github.com/neroist/uing)
 Perl6 | [perl6-libui](https://github.com/Garland-g/perl6-libui)
-PHP | [ui](https://github.com/krakjoe/ui)
+PHP | [ui](https://github.com/krakjoe/ui), [Ardillo](https://github.com/ardillo-php/ext)
 Python | [pylibui](https://github.com/joaoventura/pylibui)
 Ring | [RingLibui](https://github.com/ring-lang/ring/tree/master/extensions/ringlibui)
 Ruby | [libui-ruby](https://github.com/jamescook/libui-ruby), [LibUI](https://github.com/kojix2/libui), [Glimmer DSL for LibUI](https://github.com/AndyObtiva/glimmer-dsl-libui)
 Rust | [libui-ng-sys](https://github.com/norepimorphism/libui-ng-sys), [boing](https://github.com/norepimorphism/boing), [libui-rs](https://github.com/rust-native-ui/libui-rs), [libui](https://github.com/libui-rs/libui)
 Scala | [scalaui](https://github.com/lolgab/scalaui)
 Swift | [libui-swift](https://github.com/sclukey/libui-swift)
+Zig | [zig-libui-ng](https://github.com/desttinghim/zig-libui-ng)
 
 ## Frequently Asked Questions
 
