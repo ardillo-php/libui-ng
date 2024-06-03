@@ -62,9 +62,9 @@ static void scriptMessageReceived(WebKitUserContentManager *manager, WebKitJavas
 
 uiWebView *uiNewWebView()
 {
-	uiWebView *w;
+    uiWebView *w;
 
-	uiUnixNewControl(uiWebView, w);
+    uiUnixNewControl(uiWebView, w);
 
     w->webview = WEBKIT_WEB_VIEW(webkit_web_view_new());
     w->widget = GTK_WIDGET(w->webview);
@@ -73,5 +73,5 @@ uiWebView *uiNewWebView()
     webkit_user_content_manager_register_script_message_handler(w->manager, "webview");
     g_signal_connect(w->manager, "script-message-received::webview", G_CALLBACK(scriptMessageReceived), w);
 
-	return w;
+    return w;
 }
