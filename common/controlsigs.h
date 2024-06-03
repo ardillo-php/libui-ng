@@ -24,4 +24,5 @@
 #define uiSpinboxSignature 0x5370696E
 #define uiTabSignature 0x54616273
 #define uiTableSignature 0x5461626C
+#define uiWebViewSignature 0x57656276
 #define uiWindowSignature 0x57696E64

@@ -2072,7 +2072,7 @@ _UI_EXTERN uiArea *uiNewArea(uiAreaHandler *ah);
 _UI_EXTERN uiArea *uiNewScrollingArea(uiAreaHandler *ah, int width, int height);
 
 /**
- * Returns the user data associated with the uiTableModel.
+ * Returns the user data associated with the uiArea.
  *
  * @param a Area to read.
  * @returns pointer to the user data structure.
@@ -2081,7 +2081,7 @@ _UI_EXTERN uiArea *uiNewScrollingArea(uiAreaHandler *ah, int width, int height);
 _UI_EXTERN void* uiAreaGetUserData(uiArea *m);
 
 /**
- * Sets the user data associated with the uiTableModel.
+ * Sets the user data associated with the uiArea.
  *
  * @param a uiArea to configure.
  * @param userData pointer to the user data structure.
@@ -4064,6 +4064,89 @@ _UI_EXTERN void uiTableSetSelection(uiTable *t, uiTableSelection *sel);
  * @memberof uiTableSelection
  */
 _UI_EXTERN void uiFreeTableSelection(uiTableSelection* s);
+
+
+/**
+ * WebView control
+ *
+ * @struct uiWebView
+ * @extends uiControl
+ * @ingroup static
+ */
+typedef struct uiWebView uiWebView;
+#define uiWebView(this) ((uiWebView *) (this))
+
+/**
+ * Enables/disables developer tools in the WebView, if available
+ *
+ * @param w uiWebView instance.
+ * @param enable `TRUE` to enable developer tools, `FALSE` to disable.
+ * @memberof uiWebView
+ */
+_UI_EXTERN void uiWebViewEnableDevTools(uiWebView *w, int enable);
+
+/**
+ * Inserts and executes initial JavaScript code in the WebView
+ *
+ * @param w uiWebView instance.
+ * @param script JavaScript code to execute.
+ * @memberof uiWebView
+ */
+_UI_EXTERN void uiWebViewSetInitScript(uiWebView *w, const char *script);
+
+/**
+ * Registers a callback for when the WebView receives a message
+ *
+ * @param w uiWebView instance.
+ * @param f Callback function.\n
+ *          @p sender Back reference to the instance that triggered the callback.\n
+ *          @p msg Message received.\n
+ *          @p senderData User data registered with the sender instance.
+ * @param data User data to be passed to the callback.
+ *
+ * @note Only one callback can be registered at a time.
+ * @memberof uiWebView
+ */
+_UI_EXTERN void uiWebViewOnMessage(uiWebView *w,
+	void (*f)(uiWebView *w, const char *msg, void *data),
+	void *data);
+
+/**
+ * Sets the WebView HTML code
+ *
+ * @param w uiWebView instance.
+ * @param text HTML text.\n
+ *             A valid, `NUL` terminated UTF-8 string.\n
+ *             Data is copied internally. Ownership is not transferred.
+ * @memberof uiWebView
+ */
+_UI_EXTERN void uiWebViewSetHtml(uiWebView *w, const char *html);
+
+/**
+ * Sets the WebView URI
+ *
+ * @param w uiWebView instance.
+ * @param uri URI to load.
+ * @memberof uiWebView
+ */
+_UI_EXTERN void uiWebViewSetUri(uiWebView *w, const char *uri);
+
+/**
+  * Executes JavaScript code in the WebView
+  *
+  * @param w uiWebView instance.
+  * @param js JavaScript code to execute.
+  * @memberof uiWebView
+  */
+_UI_EXTERN void uiWebViewEval(uiWebView *w, const char *js);
+
+/**
+ * Creates a new WebView.
+ *
+ * @returns A new uiWebView instance.
+ * @memberof uiWebView @static
+ */
+_UI_EXTERN uiWebView *uiNewWebView();
 
 #ifdef __cplusplus
 }
