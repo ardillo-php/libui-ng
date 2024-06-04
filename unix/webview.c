@@ -31,6 +31,41 @@ void uiWebViewOnMessage(uiWebView *w, void (*f)(uiWebView *w, const char *msg, v
 	w->onMessageData = data;
 }
 
+void uiWebViewRegisterUriScheme(uiWebView *w, const char *scheme, void (*f)(void *request, void *data), void *userData)
+{
+    WebKitWebContext *context = webkit_web_view_get_context(w->webview);
+    WebKitSecurityManager *securityManager = webkit_web_context_get_security_manager(context);
+
+    webkit_security_manager_register_uri_scheme_as_secure(securityManager, scheme);
+    webkit_security_manager_register_uri_scheme_as_cors_enabled(securityManager, scheme);
+
+    webkit_web_context_register_uri_scheme(context, scheme, f, userData, NULL);
+}
+
+const char *uiWebViewRequestGetScheme(void *request)
+{
+    return webkit_uri_scheme_request_get_scheme((WebKitURISchemeRequest *)request);
+}
+
+const char *uiWebViewRequestGetUri(void *request)
+{
+    return webkit_uri_scheme_request_get_uri((WebKitURISchemeRequest *)request);
+}
+
+const char *uiWebViewRequestGetPath(void *request)
+{
+    return webkit_uri_scheme_request_get_path((WebKitURISchemeRequest *)request);
+}
+
+void uiWebViewRequestRespond(void *request, const char *body, const char *contentType)
+{
+    size_t bodyLen = strlen(body);
+    GInputStream *stream = g_memory_input_stream_new_from_data(body, bodyLen, NULL);
+
+    webkit_uri_scheme_request_finish((WebKitURISchemeRequest *)request, stream, bodyLen, contentType);
+    g_object_unref(stream);
+}
+
 void uiWebViewSetHtml(uiWebView *w, const char *html)
 {
 	webkit_web_view_load_html(w->webview, html, NULL);

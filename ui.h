@@ -4112,6 +4112,58 @@ _UI_EXTERN void uiWebViewOnMessage(uiWebView *w,
 	void *data);
 
 /**
+ * Registers a callback for handling requests over custom URI scheme(s)
+ *
+ * @param webview uiWebView instance.
+ * @param scheme URI scheme to register.
+ * @param f Callback function.\n
+ *          @p request Request object.\n
+ *          @p data User data registered with the sender instance.
+ * @param userData User data to be passed to the callback.
+ * @memberof uiWebView
+ */
+_UI_EXTERN void uiWebViewRegisterUriScheme(uiWebView *webview, const char *scheme,
+	void (*f)(void *request, void *data),
+	void *userData);
+
+/**
+ * Returns the URI scheme of a custom request
+ *
+ * @param request Request object.
+ * @returns URI scheme.
+ * @memberof uiWebView
+ */
+_UI_EXTERN const char *uiWebViewRequestGetScheme(void *request);
+
+/**
+ * Returns the URI of a custom request
+ *
+ * @param request Request object.
+ * @returns URI.
+ * @memberof uiWebView
+ */
+_UI_EXTERN const char *uiWebViewRequestGetUri(void *request);
+
+/**
+ * Returns the path of a custom request
+ *
+ * @param request Request object.
+ * @returns Path.
+ * @memberof uiWebView
+ */
+_UI_EXTERN const char *uiWebViewRequestGetPath(void *request);
+
+/**
+ * Responds to a custom request
+ *
+ * @param request Request object.
+ * @param body Response body.
+ * @param contentType Response content type.
+ * @memberof uiWebView
+ */
+_UI_EXTERN void uiWebViewRequestRespond(void *request, const char *body, const char *contentType);
+
+/**
  * Sets the WebView HTML code
  *
  * @param w uiWebView instance.
