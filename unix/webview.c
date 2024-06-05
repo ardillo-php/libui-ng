@@ -39,7 +39,9 @@ void uiWebViewRegisterUriScheme(uiWebView *w, const char *scheme, void (*f)(void
     webkit_security_manager_register_uri_scheme_as_secure(securityManager, scheme);
     webkit_security_manager_register_uri_scheme_as_cors_enabled(securityManager, scheme);
 
-    webkit_web_context_register_uri_scheme(context, scheme, f, userData, NULL);
+    void (*gf)(WebKitURISchemeRequest *, void *) = (void (*)(WebKitURISchemeRequest *, void *))f;
+
+    webkit_web_context_register_uri_scheme(context, scheme, gf, userData, NULL);
 }
 
 const char *uiWebViewRequestGetScheme(void *request)
@@ -57,12 +59,10 @@ const char *uiWebViewRequestGetPath(void *request)
     return webkit_uri_scheme_request_get_path((WebKitURISchemeRequest *)request);
 }
 
-void uiWebViewRequestRespond(void *request, const char *body, const char *contentType)
+void uiWebViewRequestRespond(void *request, const char *body, size_t length, const char *contentType)
 {
-    size_t bodyLen = strlen(body);
-    GInputStream *stream = g_memory_input_stream_new_from_data(body, bodyLen, NULL);
-
-    webkit_uri_scheme_request_finish((WebKitURISchemeRequest *)request, stream, bodyLen, contentType);
+    GInputStream *stream = g_memory_input_stream_new_from_data(g_memdup2(body, length), length, g_free);
+    webkit_uri_scheme_request_finish((WebKitURISchemeRequest *)request, stream, length, contentType);
     g_object_unref(stream);
 }
 
