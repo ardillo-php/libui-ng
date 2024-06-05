@@ -49,6 +49,7 @@ libui_sources += [
 	'darwin/undocumented.m',
 	'darwin/util.m',
 	'darwin/window.m',
+	'darwin/webview.m',
 	'darwin/winmoveresize.m',
 	'darwin/nstextfield.m',
 ]
@@ -57,7 +58,7 @@ libui_deps += [
 	meson.get_compiler('objc').find_library('objc',
 		required: true),
 	dependency('appleframeworks',
-		modules: ['Foundation', 'AppKit'],
+		modules: ['Foundation', 'AppKit', 'Webkit'],
 		required: true),
 ]
 # the / is required by some older versions of OS X
