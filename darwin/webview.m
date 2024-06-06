@@ -16,7 +16,6 @@ struct uiWebView {
 	WKWebView *webview;
 	WKWebViewConfiguration *config;
 	uiWebViewScriptMessageHandler *msgHandler;
-	NSMutableArray *urlSchemeHandlers;
 	void (*onMessage)(uiWebView *w, const char *msg, void *data);
 	void *onMessageData;
 };
@@ -102,38 +101,36 @@ void uiWebViewRegisterUriScheme(uiWebView *w, const char *scheme, void (*f)(void
 		[w->config setURLSchemeHandler:handler forURLScheme:[NSString stringWithUTF8String:scheme]];
 	}
 
-	if (w->urlSchemeHandlers == nil) {
-		w->urlSchemeHandlers = [[NSMutableArray alloc] init];
-	}
-
-	[w->urlSchemeHandlers addObject:handler];
-
 	uiWebViewReset(w);
 }
 
 const char *uiWebViewRequestGetScheme(void *request)
 {
-	NSURLRequest *req = (NSURLRequest *)request;
-	return [[[req URL] scheme] UTF8String];
+	id<WKURLSchemeTask> task = (id<WKURLSchemeTask>)request;
+	return [[task request].URL.scheme UTF8String];
 }
 
 const char *uiWebViewRequestGetUri(void *request)
 {
-	NSURLRequest *req = (NSURLRequest *)request;
-	return [[[req URL] absoluteString] UTF8String];
+	id<WKURLSchemeTask> task = (id<WKURLSchemeTask>)request;
+	return [[[task request].URL absoluteString] UTF8String];
 }
 
 const char *uiWebViewRequestGetPath(void *request)
 {
-	NSURLRequest *req = (NSURLRequest *)request;
-	return [[[req URL] path] UTF8String];
+	id<WKURLSchemeTask> task = (id<WKURLSchemeTask>)request;
+	return [[[task request].URL path] UTF8String];
 }
 
-void uiWebViewRequestRespond(void *request, const char *body, const char *contentType)
+void uiWebViewRequestRespond(void *request, const char *body, size_t length, const char *contentType)
 {
-	NSURLRequest *req = (NSURLRequest *)request;
-	NSURLResponse *response = [[NSURLResponse alloc] initWithURL:[req URL] MIMEType:[NSString stringWithUTF8String:contentType] expectedContentLength:strlen(body) textEncodingName:nil];
-	[[NSURLCache sharedURLCache] storeCachedResponse:[[NSCachedURLResponse alloc] initWithResponse:response data:[NSData dataWithBytes:body length:strlen(body)]] forRequest:req];
+	id<WKURLSchemeTask> task = (id<WKURLSchemeTask>)request;
+	NSURLRequest *req = [task request];
+	NSURLResponse *response = [[NSURLResponse alloc] initWithURL:[req URL] MIMEType:[NSString stringWithUTF8String:contentType] expectedContentLength:length textEncodingName:nil];
+
+	[task didReceiveResponse:response];
+	[task didReceiveData:[NSData dataWithBytes:body length:length]];
+	[task didFinish];
 }
 
 void uiWebViewSetHtml(uiWebView *w, const char *html)
@@ -172,22 +169,9 @@ uiWebView *uiNewWebView()
 
 - (void)webView:(WKWebView *)webView startURLSchemeTask:(id<WKURLSchemeTask>)urlSchemeTask API_AVAILABLE(macos(10.13))
 {
-    // Handle custom scheme request
-    NSURL *url = urlSchemeTask.request.URL;
-    NSLog(@"Handling custom URL: %@", url);
-
-    // Provide a simple response
-    NSString *responseString = [NSString stringWithFormat:@"Handled by custom scheme handler: %@", url.absoluteString];
-    NSData *responseData = [responseString dataUsingEncoding:NSUTF8StringEncoding];
-
-    NSURLResponse *response = [[NSURLResponse alloc] initWithURL:url
-                                                        MIMEType:@"text/plain"
-                                           expectedContentLength:responseData.length
-                                                textEncodingName:@"utf-8"];
-
-    [urlSchemeTask didReceiveResponse:response];
-    [urlSchemeTask didReceiveData:responseData];
-    [urlSchemeTask didFinish];
+	if (self.f != NULL) {
+		self.f(urlSchemeTask, self.userData);
+	}
 }
 
 - (void)webView:(WKWebView *)webView stopURLSchemeTask:(id<WKURLSchemeTask>)urlSchemeTask API_AVAILABLE(macos(10.13))
