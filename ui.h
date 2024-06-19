@@ -4067,32 +4067,36 @@ _UI_EXTERN void uiFreeTableSelection(uiTableSelection* s);
 
 
 /**
+ * WebView parameters passed to uiNewWebView().
+ *
+ * @struct uiWebViewParams
+ * @ingroup webview
+ */
+typedef struct uiWebViewParams uiWebViewParams;
+struct uiWebViewParams {
+	/**
+	 * Enables/disables developer tools in the WebView, if available
+	 */
+	int EnableDevTools;
+	/**
+	 * JavaScript code to be executed prior to loading any page
+	 */
+	char *InitScript;
+	/**
+	 * Comma separated list of custom URI schemes to be registered by the WebView
+	 */
+	char *CustomUriSchemes;
+};
+
+/**
  * WebView control
  *
  * @struct uiWebView
  * @extends uiControl
- * @ingroup static
+ * @ingroup webview
  */
 typedef struct uiWebView uiWebView;
 #define uiWebView(this) ((uiWebView *) (this))
-
-/**
- * Enables/disables developer tools in the WebView, if available
- *
- * @param w uiWebView instance.
- * @param enable `TRUE` to enable developer tools, `FALSE` to disable.
- * @memberof uiWebView
- */
-_UI_EXTERN void uiWebViewEnableDevTools(uiWebView *w, int enable);
-
-/**
- * Inserts and executes initial JavaScript code in the WebView
- *
- * @param w uiWebView instance.
- * @param script JavaScript code to execute.
- * @memberof uiWebView
- */
-_UI_EXTERN void uiWebViewSetInitScript(uiWebView *w, const char *script);
 
 /**
  * Registers a callback for when the WebView receives a message
@@ -4112,19 +4116,21 @@ _UI_EXTERN void uiWebViewOnMessage(uiWebView *w,
 	void *data);
 
 /**
- * Registers a callback for handling requests over custom URI scheme(s)
+ * Registers a callback for when the WebView receives a custom URI scheme request
  *
- * @param webview uiWebView instance.
- * @param scheme URI scheme to register.
+ * @param w uiWebView instance.
  * @param f Callback function.\n
- *          @p request Request object.\n
- *          @p data User data registered with the sender instance.
- * @param userData User data to be passed to the callback.
+ *          @p sender Back reference to the instance that triggered the callback.\n
+ *          @p request Request received.\n
+ *          @p senderData User data registered with the sender instance.
+ * @param data User data to be passed to the callback.
+ *
+ * @note Only one callback can be registered at a time.
  * @memberof uiWebView
  */
-_UI_EXTERN void uiWebViewRegisterUriScheme(uiWebView *webview, const char *scheme,
-	void (*f)(void *request, void *data),
-	void *userData);
+_UI_EXTERN void uiWebViewOnRequest(uiWebView *w,
+	void (*f)(uiWebView *w, void *request, void *data),
+	void *data);
 
 /**
  * Returns the URI scheme of a custom request
@@ -4196,10 +4202,11 @@ _UI_EXTERN void uiWebViewEval(uiWebView *w, const char *js);
 /**
  * Creates a new WebView.
  *
+ * @param params WebView parameters.
  * @returns A new uiWebView instance.
  * @memberof uiWebView @static
  */
-_UI_EXTERN uiWebView *uiNewWebView();
+_UI_EXTERN uiWebView *uiNewWebView(uiWebViewParams *params);
 
 #ifdef __cplusplus
 }
