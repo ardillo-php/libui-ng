@@ -8,22 +8,11 @@ struct uiWebView {
 	WebKitUserContentManager *manager;
 	void (*onMessage)(uiWebView *w, const char *msg, void *data);
 	void *onMessageData;
+	void (*onRequest)(uiWebView *w, void *request, void *data);
+	void *onRequestData;
 };
 
 uiUnixControlAllDefaults(uiWebView)
-
-void uiWebViewEnableDevTools(uiWebView *w, int enable)
-{
-	WebKitSettings *settings = webkit_web_view_get_settings(w->webview);
-	webkit_settings_set_enable_developer_extras(settings, enable);
-}
-
-void uiWebViewSetInitScript(uiWebView *w, const char *script)
-{
-	WebKitUserScript *userScript = webkit_user_script_new(script, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
-	webkit_user_content_manager_add_script(w->manager, userScript);
-	webkit_user_script_unref(userScript);
-}
 
 void uiWebViewOnMessage(uiWebView *w, void (*f)(uiWebView *w, const char *msg, void *data), void *data)
 {
@@ -31,39 +20,32 @@ void uiWebViewOnMessage(uiWebView *w, void (*f)(uiWebView *w, const char *msg, v
 	w->onMessageData = data;
 }
 
-void uiWebViewRegisterUriScheme(uiWebView *w, const char *scheme, void (*f)(void *request, void *data), void *userData)
+void uiWebViewOnRequest(uiWebView *w, void (*f)(uiWebView *w, void *request, void *data), void *data)
 {
-    WebKitWebContext *context = webkit_web_view_get_context(w->webview);
-    WebKitSecurityManager *securityManager = webkit_web_context_get_security_manager(context);
-
-    webkit_security_manager_register_uri_scheme_as_secure(securityManager, scheme);
-    webkit_security_manager_register_uri_scheme_as_cors_enabled(securityManager, scheme);
-
-    void (*gf)(WebKitURISchemeRequest *, void *) = (void (*)(WebKitURISchemeRequest *, void *))f;
-
-    webkit_web_context_register_uri_scheme(context, scheme, gf, userData, NULL);
+	w->onRequest = f;
+	w->onRequestData = data;
 }
 
 const char *uiWebViewRequestGetScheme(void *request)
 {
-    return webkit_uri_scheme_request_get_scheme((WebKitURISchemeRequest *)request);
+	return webkit_uri_scheme_request_get_scheme((WebKitURISchemeRequest *)request);
 }
 
 const char *uiWebViewRequestGetUri(void *request)
 {
-    return webkit_uri_scheme_request_get_uri((WebKitURISchemeRequest *)request);
+	return webkit_uri_scheme_request_get_uri((WebKitURISchemeRequest *)request);
 }
 
 const char *uiWebViewRequestGetPath(void *request)
 {
-    return webkit_uri_scheme_request_get_path((WebKitURISchemeRequest *)request);
+	return webkit_uri_scheme_request_get_path((WebKitURISchemeRequest *)request);
 }
 
 void uiWebViewRequestRespond(void *request, const char *body, size_t length, const char *contentType)
 {
-    GInputStream *stream = g_memory_input_stream_new_from_data(g_memdup2(body, length), length, g_free);
-    webkit_uri_scheme_request_finish((WebKitURISchemeRequest *)request, stream, length, contentType);
-    g_object_unref(stream);
+	GInputStream *stream = g_memory_input_stream_new_from_data(g_memdup2(body, length), length, g_free);
+	webkit_uri_scheme_request_finish((WebKitURISchemeRequest *)request, stream, length, contentType);
+	g_object_unref(stream);
 }
 
 void uiWebViewSetHtml(uiWebView *w, const char *html)
@@ -95,7 +77,14 @@ static void scriptMessageReceived(WebKitUserContentManager *manager, WebKitJavas
 	}
 }
 
-uiWebView *uiNewWebView()
+static void customRequestReceived(WebKitURISchemeRequest *request, uiWebView *w)
+{
+	if (w->onRequest) {
+		(*(w->onRequest))(w, request, w->onRequestData);
+	}
+}
+
+uiWebView *uiNewWebView(uiWebViewParams *p)
 {
 	uiWebView *w;
 
@@ -104,6 +93,35 @@ uiWebView *uiNewWebView()
 	w->webview = WEBKIT_WEB_VIEW(webkit_web_view_new());
 	w->widget = GTK_WIDGET(w->webview);
 	w->manager = webkit_web_view_get_user_content_manager(w->webview);
+
+	WebKitSettings *settings = webkit_web_view_get_settings(w->webview);
+	webkit_settings_set_enable_developer_extras(settings, p->EnableDevTools);
+
+	if (p->InitScript) {
+		WebKitUserScript *userScript = webkit_user_script_new(
+			p->InitScript, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL
+		);
+		webkit_user_content_manager_add_script(w->manager, userScript);
+		webkit_user_script_unref(userScript);
+	}
+
+	if (p->CustomUriSchemes) {
+		WebKitWebContext *context = webkit_web_view_get_context(w->webview);
+		WebKitSecurityManager *securityManager = webkit_web_context_get_security_manager(context);
+		void (*gf)(WebKitURISchemeRequest *, void *) = (void (*)(WebKitURISchemeRequest *, void *))customRequestReceived;
+		char *schemes = g_strdup(p->CustomUriSchemes);
+		char *scheme = strtok(schemes, ",");
+
+		while (scheme) {
+			webkit_security_manager_register_uri_scheme_as_secure(securityManager, scheme);
+			webkit_security_manager_register_uri_scheme_as_cors_enabled(securityManager, scheme);
+			webkit_web_context_register_uri_scheme(context, scheme, gf, w, NULL);
+
+			scheme = strtok(NULL, ",");
+		}
+
+		g_free(schemes);
+	}
 
 	webkit_user_content_manager_register_script_message_handler(w->manager, "webview");
 	g_signal_connect(w->manager, "script-message-received::webview", G_CALLBACK(scriptMessageReceived), w);
