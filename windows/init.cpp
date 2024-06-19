@@ -135,6 +135,9 @@ const char *uiInit(uiInitOptions *o)
 	if (hr != S_OK)
 		return ieHRESULT("initializing WIC", hr);
 
+	if (registerWebViewClass(hDefaultIcon, hDefaultCursor) == 0)
+		return ieLastErr("registering uiWebView window class");
+
 	return NULL;
 }
 
@@ -148,6 +151,7 @@ void uiUninit(void)
 	unregisterArea();
 	uiprivUninitDrawText();
 	uninitDraw();
+	unregisterWebView();
 	CoUninitialize();
 	if (DeleteObject(hollowBrush) == 0)
 		logLastError(L"error freeing hollow brush");
