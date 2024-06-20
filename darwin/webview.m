@@ -18,72 +18,11 @@ struct uiWebView {
 	uiWebViewScriptMessageHandler *msgHandler;
 	void (*onMessage)(uiWebView *w, const char *msg, void *data);
 	void *onMessageData;
+	void (*onRequest)(uiWebView *w, void *request, void *data);
+	void *onRequestData;
 };
 
-static void uiWebViewReset(uiWebView *w)
-{
-	if (w->webview != nil) {
-		[w->webview removeFromSuperview];
-		[w->webview release];
-		w->webview = nil;
-	}
-
-	w->webview = [[WKWebView alloc] initWithFrame:w->view.bounds configuration:w->config];
-	[w->view addSubview:w->webview];
-	[w->webview setTranslatesAutoresizingMaskIntoConstraints:NO];
-
-	NSLayoutConstraint *leadingConstraint = [NSLayoutConstraint constraintWithItem:w->webview
-																attribute:NSLayoutAttributeLeading
-																relatedBy:NSLayoutRelationEqual
-																toItem:w->view
-																attribute:NSLayoutAttributeLeading
-																multiplier:1.0
-																constant:0.0];
-
-	NSLayoutConstraint *trailingConstraint = [NSLayoutConstraint constraintWithItem:w->webview
-																attribute:NSLayoutAttributeTrailing
-																relatedBy:NSLayoutRelationEqual
-																toItem:w->view
-																attribute:NSLayoutAttributeTrailing
-																multiplier:1.0
-																constant:0.0];
-
-	NSLayoutConstraint *topConstraint = [NSLayoutConstraint constraintWithItem:w->webview
-																attribute:NSLayoutAttributeTop
-																relatedBy:NSLayoutRelationEqual
-																toItem:w->view
-																attribute:NSLayoutAttributeTop
-																multiplier:1.0
-																constant:0.0];
-
-	NSLayoutConstraint *bottomConstraint = [NSLayoutConstraint constraintWithItem:w->webview
-																attribute:NSLayoutAttributeBottom
-																relatedBy:NSLayoutRelationEqual
-																toItem:w->view
-																attribute:NSLayoutAttributeBottom
-																multiplier:1.0
-																constant:0.0];
-
-	[w->view addConstraints:@[leadingConstraint, trailingConstraint, topConstraint, bottomConstraint]];
-}
-
 uiDarwinControlAllDefaults(uiWebView, view)
-
-void uiWebViewEnableDevTools(uiWebView *w, int enable)
-{
-	if (enable) {
-		[[w->config preferences] setValue:@YES forKey:@"developerExtrasEnabled"];
-	} else {
-		[[w->config preferences] setValue:@NO forKey:@"developerExtrasEnabled"];
-	}
-}
-
-void uiWebViewSetInitScript(uiWebView *w, const char *script)
-{
-	NSString *scriptString = [NSString stringWithUTF8String:script];
-	WKUserScript *userScript = [[WKUserScript alloc] initWithSource:scriptString injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
-	[[w->config userContentController] addUserScript:userScript];
-}
 
 void uiWebViewOnMessage(uiWebView *w, void (*f)(uiWebView *w, const char *msg, void *data), void *data)
 {
@@ -91,17 +30,10 @@ void uiWebViewOnMessage(uiWebView *w, void (*f)(uiWebView *w, const char *msg, v
 	w->onMessageData = data;
 }
 
-void uiWebViewRegisterUriScheme(uiWebView *w, const char *scheme, void (*f)(void *request, void *data), void *userData)
+void uiWebViewOnRequest(uiWebView *w, void (*f)(uiWebView *w, void *request, void *data), void *data)
 {
-	uiWebViewURLSchemeHandler *handler = [[uiWebViewURLSchemeHandler alloc] init];
-	handler.f = f;
-	handler.userData = userData;
-
-	if (@available(macOS 10.13, *)) {
-		[w->config setURLSchemeHandler:handler forURLScheme:[NSString stringWithUTF8String:scheme]];
-	}
-
-	uiWebViewReset(w);
+	w->onRequest = f;
+	w->onRequestData = data;
 }
 
 const char *uiWebViewRequestGetScheme(void *request)
@@ -148,7 +80,16 @@ void uiWebViewEval(uiWebView *w, const char *js)
 	[w->webview evaluateJavaScript:[NSString stringWithUTF8String:js] completionHandler:nil];
 }
 
-uiWebView *uiNewWebView()
+static void customRequestReceived(id<WKURLSchemeTask> request, void *data) API_AVAILABLE(macos(10.13))
+{
+	uiWebView *w = (uiWebView *)data;
+
+	if (w->onRequest != NULL) {
+		w->onRequest(w, request, w->onRequestData);
+	}
+}
+
+uiWebView *uiNewWebView(uiWebViewParams *p)
 {
 	uiWebView *w;
 
@@ -160,7 +101,76 @@ uiWebView *uiNewWebView()
 	w->msgHandler.w = w;
 	[[w->config userContentController] addScriptMessageHandler:w->msgHandler name:@"webview"];
 
-	uiWebViewReset(w);
+	if (p->EnableDevTools) {
+		[[w->config preferences] setValue:@YES forKey:@"developerExtrasEnabled"];
+	} else {
+		[[w->config preferences] setValue:@NO forKey:@"developerExtrasEnabled"];
+	}
+
+	if (p->InitScript) {
+		NSString *scriptString = [NSString stringWithUTF8String:p->InitScript];
+		WKUserScript *userScript = [[WKUserScript alloc] initWithSource:scriptString injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
+		[[w->config userContentController] addUserScript:userScript];
+	}
+
+	if (p->CustomUriSchemes) {
+		uiWebViewURLSchemeHandler *handler = [[uiWebViewURLSchemeHandler alloc] init];
+		char *schemes = strdup(p->CustomUriSchemes);
+		char *scheme = strtok(schemes, ",");
+
+		if (@available(macOS 10.13, *)) {
+			handler.f = (void (*)(void *, void *))customRequestReceived;
+			handler.userData = w;
+		}
+
+		while (scheme) {
+			if (@available(macOS 10.13, *)) {
+				[w->config setURLSchemeHandler:handler forURLScheme:[NSString stringWithUTF8String:scheme]];
+			}
+
+			scheme = strtok(NULL, ",");
+		}
+
+		free(schemes);
+	}
+
+	w->webview = [[WKWebView alloc] initWithFrame:w->view.bounds configuration:w->config];
+	[w->view addSubview:w->webview];
+	[w->webview setTranslatesAutoresizingMaskIntoConstraints:NO];
+
+	NSLayoutConstraint *leadingConstraint = [NSLayoutConstraint constraintWithItem:w->webview
+											attribute:NSLayoutAttributeLeading
+											relatedBy:NSLayoutRelationEqual
+											toItem:w->view
+											attribute:NSLayoutAttributeLeading
+											multiplier:1.0
+											constant:0.0];
+
+	NSLayoutConstraint *trailingConstraint = [NSLayoutConstraint constraintWithItem:w->webview
+											attribute:NSLayoutAttributeTrailing
+											relatedBy:NSLayoutRelationEqual
+											toItem:w->view
+											attribute:NSLayoutAttributeTrailing
+											multiplier:1.0
+											constant:0.0];
+
+	NSLayoutConstraint *topConstraint = [NSLayoutConstraint constraintWithItem:w->webview
+											attribute:NSLayoutAttributeTop
+											relatedBy:NSLayoutRelationEqual
+											toItem:w->view
+											attribute:NSLayoutAttributeTop
+											multiplier:1.0
+											constant:0.0];
+
+	NSLayoutConstraint *bottomConstraint = [NSLayoutConstraint constraintWithItem:w->webview
+											attribute:NSLayoutAttributeBottom
+											relatedBy:NSLayoutRelationEqual
+											toItem:w->view
+											attribute:NSLayoutAttributeBottom
+											multiplier:1.0
+											constant:0.0];
+
+	[w->view addConstraints:@[leadingConstraint, trailingConstraint, topConstraint, bottomConstraint]];
 
 	return w;
 }
