@@ -5,6 +5,7 @@ curl -sSL "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2" | tar -x
 
 #include "uipriv_windows.hpp"
 #include "deps/webview2/build/native/include/WebView2.h"
+#include "deps/webview2/build/native/include/WebView2EnvironmentOptions.h"
 #include <wrl.h>
 #include <locale>
 #include <codecvt>
@@ -15,11 +16,6 @@ curl -sSL "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2" | tar -x
 
 using namespace Microsoft::WRL;
 
-struct uriSchemeHandler {
-	void (*handler)(void *request, void *data);
-	void *userData;
-};
-
 struct uiWebView {
 	uiWindowsControl c;
 	HWND hwnd;
@@ -27,9 +23,10 @@ struct uiWebView {
 	ICoreWebView2Controller *controller;
 	ICoreWebView2 *webView;
 	ICoreWebView2Settings *settings;
-	std::map<std::string, uriSchemeHandler> uriSchemeHandlers;
 	void (*onMessage)(uiWebView *w, const char *msg, void *data);
 	void *onMessageData;
+	void (*onRequest)(uiWebView *w, void *request, void *data);
+	void *onRequestData;
 };
 
 uiWindowsControlAllDefaults(uiWebView)
@@ -38,51 +35,73 @@ static void uiWebViewMinimumSize(uiWindowsControl *c, int *width, int *height)
 {
 }
 
-void uiWebViewEnableDevTools(uiWebView *w, int enable)
-{
-	w->settings->put_AreDevToolsEnabled(enable);
-}
-
-void uiWebViewSetInitScript(uiWebView *w, const char *script)
-{
-	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-	std::wstring wideScript = converter.from_bytes(script);
-	w->webView->AddScriptToExecuteOnDocumentCreated(wideScript.c_str(), nullptr);
-}
-
 void uiWebViewOnMessage(uiWebView *w, void (*f)(uiWebView *w, const char *msg, void *data), void *data)
 {
 	w->onMessage = f;
 	w->onMessageData = data;
 }
 
-void uiWebViewRegisterUriScheme(uiWebView *w, const char *scheme, void (*f)(void *request, void *data), void *userData)
+void uiWebViewOnRequest(uiWebView *w, void (*f)(uiWebView *w, void *request, void *data), void *data)
 {
-	/*
-	printf("uiWebViewRegisterUriScheme: %s\n", scheme);
-	printf("# of schemes: %d\n", w->uriSchemeHandlers.size());
-	Sleep(15000);
-	w->uriSchemeHandlers[scheme] = {f, userData};
-	printf("uiWebViewRegisterUriScheme: %s done!\n", scheme);
-	*/
+	w->onRequest = f;
+	w->onRequestData = data;
 }
 
 const char *uiWebViewRequestGetScheme(void *request)
 {
-	// TODO
-	return NULL;
+	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
+	ICoreWebView2WebResourceRequest *req;
+	WCHAR *uri;
+	
+	args->get_Request(&req);	
+	req->get_Uri(&uri);
+
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	std::string narrowUri = converter.to_bytes(uri);
+
+	size_t colon = narrowUri.find_first_of(":");
+	
+	if (colon != std::string::npos) {
+		return narrowUri.substr(0, colon).c_str();
+	}
+
+	return "";
 }
 
 const char *uiWebViewRequestGetUri(void *request)
 {
-	// TODO
-	return NULL;
+	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
+	ICoreWebView2WebResourceRequest *req;
+	WCHAR *uri;
+	
+	args->get_Request(&req);	
+	req->get_Uri(&uri);
+
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	std::string narrowUri = converter.to_bytes(uri);
+
+	return narrowUri.c_str();
 }
 
 const char *uiWebViewRequestGetPath(void *request)
 {
-	// TODO
-	return NULL;
+	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
+	ICoreWebView2WebResourceRequest *req;
+	WCHAR *uri;
+	
+	args->get_Request(&req);	
+	req->get_Uri(&uri);
+
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	std::string narrowUri = converter.to_bytes(uri);
+
+	size_t colon = narrowUri.find_first_of(":");
+	
+	if (colon != std::string::npos) {
+		return narrowUri.substr(colon + 1).c_str();
+	}
+
+	return narrowUri.c_str();
 }
 
 void uiWebViewRequestRespond(void *request, const char *body, size_t length, const char *contentType)
@@ -155,12 +174,15 @@ void unregisterWebView(void)
 	UnregisterClassW(webViewClass, hInstance);
 }
 
-uiWebView *uiNewWebViewSync(void)
+uiWebView *uiNewWebView(uiWebViewParams *p)
 {
-	std::promise<void> p;
-	std::future<void> f = p.get_future();
+	std::promise<void> promise;
+	std::future<void> f = promise.get_future();
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 	uiWebView *w;
 	HRESULT hr;
+	auto woptions = Make<CoreWebView2EnvironmentOptions>();
+	ComPtr<ICoreWebView2EnvironmentOptions4> woptions4;
 
 	uiWindowsNewControl(uiWebView, w);
 
@@ -170,11 +192,33 @@ uiWebView *uiNewWebViewSync(void)
 		hInstance, w,
 		FALSE);
 
-	hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, nullptr,
+	woptions.As(&woptions4);
+
+	if (p->CustomUriSchemes) {
+		char *schemes = _strdup(p->CustomUriSchemes);
+		char *scheme = strtok(schemes, ",");
+
+		std::vector<ICoreWebView2CustomSchemeRegistration*> registrations;
+
+		while (scheme) {
+			auto reg = Make<CoreWebView2CustomSchemeRegistration>(converter.from_bytes(scheme).c_str());
+			reg->AddRef();
+			reg->put_HasAuthorityComponent(TRUE);
+			reg->put_TreatAsSecure(TRUE);
+
+			registrations.push_back(reg.Get());
+
+			scheme = strtok(NULL, ",");
+		}
+
+		woptions4->SetCustomSchemeRegistrations(registrations.size(), registrations.data());
+	}
+
+	hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, woptions.Get(),
 		Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-			[w, &p](HRESULT result, ICoreWebView2Environment *env) -> HRESULT {
+			[w, &promise](HRESULT result, ICoreWebView2Environment *env) -> HRESULT {
 				if (result != S_OK) {
-					p.set_exception(std::make_exception_ptr(std::runtime_error("error creating WebView2 environment")));
+					promise.set_exception(std::make_exception_ptr(std::runtime_error("error creating WebView2 environment")));
 					return result;
 				}
 
@@ -182,9 +226,9 @@ uiWebView *uiNewWebViewSync(void)
 
 				HRESULT hr = w->env->CreateCoreWebView2Controller(w->hwnd,
 					Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-						[w, &p](HRESULT result, ICoreWebView2Controller *controller) -> HRESULT {
+						[w, &promise](HRESULT result, ICoreWebView2Controller *controller) -> HRESULT {
 							if (result != S_OK || controller == nullptr) {
-								p.set_exception(std::make_exception_ptr(std::runtime_error("error creating WebView2 controller")));
+								promise.set_exception(std::make_exception_ptr(std::runtime_error("error creating WebView2 controller")));
 								return result;
 							}
 
@@ -193,7 +237,7 @@ uiWebView *uiNewWebViewSync(void)
 
 							HRESULT hr = w->controller->get_CoreWebView2(&w->webView);
 							if (hr != S_OK) {
-								p.set_exception(std::make_exception_ptr(std::runtime_error("error getting WebView2 interface")));
+								promise.set_exception(std::make_exception_ptr(std::runtime_error("error getting WebView2 interface")));
 								return hr;
 							}
 
@@ -217,38 +261,22 @@ uiWebView *uiNewWebViewSync(void)
 									return S_OK;
 								}).Get(), nullptr);
 
-							w->webView->AddWebResourceRequestedFilter(L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
 							w->webView->add_WebResourceRequested(Callback<ICoreWebView2WebResourceRequestedEventHandler>(
 								[w](ICoreWebView2 *sender, ICoreWebView2WebResourceRequestedEventArgs *args) -> HRESULT {
-									ICoreWebView2WebResourceRequest *request;
-									args->get_Request(&request);
-
-									LPWSTR uri;
-									request->get_Uri(&uri);
-
-									printf("uri: %ls\n", uri);
-
-									std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-									std::string uriStr = converter.to_bytes(uri);
-									std::string scheme = uriStr.substr(0, uriStr.find(":"));
-									CoTaskMemFree(uri);
-/*
-									auto it = w->uriSchemeHandlers.find(scheme);
-									if (it != w->uriSchemeHandlers.end()) {
-										it->second.handler(request, it->second.userData);
-										return S_OK;
+									if (args && w->onRequest) {
+										w->onRequest(w, args, w->onRequestData);
 									}
-*/
+
 									return S_OK;
 								}).Get(), nullptr);
 
-							p.set_value();
+							promise.set_value();
 
 							return S_OK;
 						}).Get());
 
 				if (hr != S_OK) {
-					p.set_exception(std::make_exception_ptr(std::runtime_error("error creating WebView2 controller")));
+					promise.set_exception(std::make_exception_ptr(std::runtime_error("error creating WebView2 controller")));
 					return hr;
 				}
 
@@ -265,7 +293,6 @@ uiWebView *uiNewWebViewSync(void)
 			}
 		}
 	} catch (std::exception &e) {
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 		std::wstring wideError = converter.from_bytes(e.what());
 		return NULL;
 	}
@@ -274,13 +301,27 @@ uiWebView *uiNewWebViewSync(void)
 		return NULL;
 	}
 
-	w->settings->put_AreDevToolsEnabled(TRUE);
-	w->webView->OpenDevToolsWindow();
+	w->settings->put_AreDevToolsEnabled(p->EnableDevTools);
+
+	if (p->InitScript) {
+		std::wstring wideScript = converter.from_bytes(p->InitScript);
+		w->webView->AddScriptToExecuteOnDocumentCreated(wideScript.c_str(), nullptr);
+	}
+
+	if (p->CustomUriSchemes) {
+		char *schemes = _strdup(p->CustomUriSchemes);
+		char *scheme = strtok(schemes, ",");
+
+		while (scheme) {
+			char *pattern = (char *)malloc(strlen(scheme) + 2);
+			strcpy(pattern, scheme);
+			strcat(pattern, ":*");
+
+			w->webView->AddWebResourceRequestedFilter(converter.from_bytes(pattern).c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+
+			scheme = strtok(NULL, ",");
+		}
+	}
 
 	return w;
-}
-
-uiWebView *uiNewWebView(void)
-{
-	return uiNewWebViewSync();
 }
