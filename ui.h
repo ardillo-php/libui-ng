@@ -4162,13 +4162,14 @@ _UI_EXTERN const char *uiWebViewRequestGetPath(void *request);
 /**
  * Responds to a custom request
  *
+ * @param w uiWebView instance.
  * @param request Request object.
  * @param body Response body.
  * @param length Response body length.
  * @param contentType Response content type.
  * @memberof uiWebView
  */
-_UI_EXTERN void uiWebViewRequestRespond(void *request, const char *body, size_t length, const char *contentType);
+_UI_EXTERN void uiWebViewRequestRespond(uiWebView *w, void *request, const char *body, size_t length, const char *contentType);
 
 /**
  * Sets the WebView HTML code

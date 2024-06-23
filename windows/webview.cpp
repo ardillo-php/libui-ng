@@ -11,6 +11,7 @@ curl -sSL "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2" | tar -x
 #include <codecvt>
 #include <iostream>
 #include <future>
+#include <Shlwapi.h>
 
 #pragma comment(lib, "..\\deps\\webview2\\build\\native\\x64\\WebView2Loader.dll.lib")
 
@@ -52,6 +53,7 @@ const char *uiWebViewRequestGetScheme(void *request)
 	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
 	ICoreWebView2WebResourceRequest *req;
 	WCHAR *uri;
+	char *ret;
 	
 	args->get_Request(&req);	
 	req->get_Uri(&uri);
@@ -62,10 +64,14 @@ const char *uiWebViewRequestGetScheme(void *request)
 	size_t colon = narrowUri.find_first_of(":");
 	
 	if (colon != std::string::npos) {
-		return narrowUri.substr(0, colon).c_str();
+		ret = (char *)malloc(colon + 1);
+		strncpy(ret, narrowUri.c_str(), colon);
+		ret[colon] = '\0';
+	} else {
+		ret = _strdup(narrowUri.c_str());
 	}
 
-	return "";
+	return ret;
 }
 
 const char *uiWebViewRequestGetUri(void *request)
@@ -73,14 +79,17 @@ const char *uiWebViewRequestGetUri(void *request)
 	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
 	ICoreWebView2WebResourceRequest *req;
 	WCHAR *uri;
-	
-	args->get_Request(&req);	
+	char *ret;
+
+	args->get_Request(&req);
 	req->get_Uri(&uri);
 
 	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 	std::string narrowUri = converter.to_bytes(uri);
 
-	return narrowUri.c_str();
+	ret = _strdup(narrowUri.c_str());
+
+	return ret;
 }
 
 const char *uiWebViewRequestGetPath(void *request)
@@ -88,25 +97,46 @@ const char *uiWebViewRequestGetPath(void *request)
 	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
 	ICoreWebView2WebResourceRequest *req;
 	WCHAR *uri;
-	
-	args->get_Request(&req);	
+	char *ret;
+
+	args->get_Request(&req);
 	req->get_Uri(&uri);
 
 	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 	std::string narrowUri = converter.to_bytes(uri);
 
 	size_t colon = narrowUri.find_first_of(":");
-	
-	if (colon != std::string::npos) {
-		return narrowUri.substr(colon + 1).c_str();
+
+	if (narrowUri.compare(colon, 3, "://") == 0) {
+		ret = _strdup(narrowUri.c_str() + colon + 2);
+	} else {
+		ret = _strdup("");
 	}
 
-	return narrowUri.c_str();
+	return ret;
 }
 
-void uiWebViewRequestRespond(void *request, const char *body, size_t length, const char *contentType)
+void uiWebViewRequestRespond(uiWebView *w, void *request, const char *body, size_t length, const char *contentType)
 {
-	// TODO
+	ICoreWebView2WebResourceResponse *response;
+	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
+	ICoreWebView2WebResourceRequest *req;
+
+	args->get_Request(&req);
+
+	WCHAR *uri;
+	req->get_Uri(&uri);
+
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	std::wstring wideContentType = converter.from_bytes(contentType);
+
+	IStream *stream = SHCreateMemStream((BYTE *)body, length);
+	w->env->CreateWebResourceResponse(stream, 200, L"OK", (L"Content-Type: " + wideContentType).c_str(), &response);
+	args->put_Response(response);
+
+	response->Release();
+	stream->Release();
+	args->Release();
 }
 
 void uiWebViewSetHtml(uiWebView *w, const char *html)
@@ -264,6 +294,7 @@ uiWebView *uiNewWebView(uiWebViewParams *p)
 							w->webView->add_WebResourceRequested(Callback<ICoreWebView2WebResourceRequestedEventHandler>(
 								[w](ICoreWebView2 *sender, ICoreWebView2WebResourceRequestedEventArgs *args) -> HRESULT {
 									if (args && w->onRequest) {
+										args->AddRef();
 										w->onRequest(w, args, w->onRequestData);
 									}
 
