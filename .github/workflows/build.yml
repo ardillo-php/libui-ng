@@ -81,7 +81,9 @@ jobs:
         run: meson setup builddir --buildtype=${{ matrix.buildtype }} --default-library=${{ matrix.libtype }}
       - name: Add WebView2 dependencies
         shell: cmd
-        run: mkdir deps\webview2 ; curl -sSL https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2 | tar -xf - -C deps\webview2
+        run: |
+          mkdir deps\webview2
+          curl -sSL https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2 | tar -xf - -C deps\webview2
       - name: Ninja Build
         run: ninja -C builddir --verbose
       - name: Run Tests
