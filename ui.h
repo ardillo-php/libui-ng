@@ -4133,15 +4133,6 @@ _UI_EXTERN void uiWebViewOnRequest(uiWebView *w,
 	void *data);
 
 /**
- * Returns the URI scheme of a custom request
- *
- * @param request Request object.
- * @returns URI scheme.
- * @memberof uiWebView
- */
-_UI_EXTERN const char *uiWebViewRequestGetScheme(void *request);
-
-/**
  * Returns the URI of a custom request
  *
  * @param request Request object.
@@ -4149,15 +4140,6 @@ _UI_EXTERN const char *uiWebViewRequestGetScheme(void *request);
  * @memberof uiWebView
  */
 _UI_EXTERN const char *uiWebViewRequestGetUri(void *request);
-
-/**
- * Returns the path of a custom request
- *
- * @param request Request object.
- * @returns Path.
- * @memberof uiWebView
- */
-_UI_EXTERN const char *uiWebViewRequestGetPath(void *request);
 
 /**
  * Responds to a custom request

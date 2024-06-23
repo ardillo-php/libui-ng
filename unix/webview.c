@@ -26,22 +26,12 @@ void uiWebViewOnRequest(uiWebView *w, void (*f)(uiWebView *w, void *request, voi
 	w->onRequestData = data;
 }
 
-const char *uiWebViewRequestGetScheme(void *request)
-{
-	return webkit_uri_scheme_request_get_scheme((WebKitURISchemeRequest *)request);
-}
-
 const char *uiWebViewRequestGetUri(void *request)
 {
 	return webkit_uri_scheme_request_get_uri((WebKitURISchemeRequest *)request);
 }
 
-const char *uiWebViewRequestGetPath(void *request)
-{
-	return webkit_uri_scheme_request_get_path((WebKitURISchemeRequest *)request);
-}
-
-void uiWebViewRequestRespond(void *request, const char *body, size_t length, const char *contentType)
+void uiWebViewRequestRespond(uiWebView *w, void *request, const char *body, size_t length, const char *contentType)
 {
 	GInputStream *stream = g_memory_input_stream_new_from_data(g_memdup2(body, length), length, g_free);
 	webkit_uri_scheme_request_finish((WebKitURISchemeRequest *)request, stream, length, contentType);

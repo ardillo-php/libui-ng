@@ -48,32 +48,6 @@ void uiWebViewOnRequest(uiWebView *w, void (*f)(uiWebView *w, void *request, voi
 	w->onRequestData = data;
 }
 
-const char *uiWebViewRequestGetScheme(void *request)
-{
-	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
-	ICoreWebView2WebResourceRequest *req;
-	WCHAR *uri;
-	char *ret;
-	
-	args->get_Request(&req);	
-	req->get_Uri(&uri);
-
-	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-	std::string narrowUri = converter.to_bytes(uri);
-
-	size_t colon = narrowUri.find_first_of(":");
-	
-	if (colon != std::string::npos) {
-		ret = (char *)malloc(colon + 1);
-		strncpy(ret, narrowUri.c_str(), colon);
-		ret[colon] = '\0';
-	} else {
-		ret = _strdup(narrowUri.c_str());
-	}
-
-	return ret;
-}
-
 const char *uiWebViewRequestGetUri(void *request)
 {
 	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
@@ -88,30 +62,6 @@ const char *uiWebViewRequestGetUri(void *request)
 	std::string narrowUri = converter.to_bytes(uri);
 
 	ret = _strdup(narrowUri.c_str());
-
-	return ret;
-}
-
-const char *uiWebViewRequestGetPath(void *request)
-{
-	ICoreWebView2WebResourceRequestedEventArgs *args = (ICoreWebView2WebResourceRequestedEventArgs *)request;
-	ICoreWebView2WebResourceRequest *req;
-	WCHAR *uri;
-	char *ret;
-
-	args->get_Request(&req);
-	req->get_Uri(&uri);
-
-	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-	std::string narrowUri = converter.to_bytes(uri);
-
-	size_t colon = narrowUri.find_first_of(":");
-
-	if (narrowUri.compare(colon, 3, "://") == 0) {
-		ret = _strdup(narrowUri.c_str() + colon + 2);
-	} else {
-		ret = _strdup("");
-	}
 
 	return ret;
 }

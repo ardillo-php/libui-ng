@@ -36,25 +36,13 @@ void uiWebViewOnRequest(uiWebView *w, void (*f)(uiWebView *w, void *request, voi
 	w->onRequestData = data;
 }
 
-const char *uiWebViewRequestGetScheme(void *request)
-{
-	id<WKURLSchemeTask> task = (id<WKURLSchemeTask>)request;
-	return [[task request].URL.scheme UTF8String];
-}
-
 const char *uiWebViewRequestGetUri(void *request)
 {
 	id<WKURLSchemeTask> task = (id<WKURLSchemeTask>)request;
 	return [[[task request].URL absoluteString] UTF8String];
 }
 
-const char *uiWebViewRequestGetPath(void *request)
-{
-	id<WKURLSchemeTask> task = (id<WKURLSchemeTask>)request;
-	return [[[task request].URL path] UTF8String];
-}
-
-void uiWebViewRequestRespond(void *request, const char *body, size_t length, const char *contentType)
+void uiWebViewRequestRespond(uiWebView *w, void *request, const char *body, size_t length, const char *contentType)
 {
 	id<WKURLSchemeTask> task = (id<WKURLSchemeTask>)request;
 	NSURLRequest *req = [task request];
