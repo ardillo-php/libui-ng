@@ -88,7 +88,7 @@ jobs:
         run: ninja -C builddir --verbose
       - name: Copy WebView2 binaries
         shell: cmd
-        run: cp deps\\webview2\\build\\native\\x64\\* builddir
+        run: copy deps\\webview2\\build\\native\\x64\\* builddir
       - name: Run Tests
         run: meson test -C builddir --verbose
       - name: Upload artifacts
