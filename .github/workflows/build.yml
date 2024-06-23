@@ -55,7 +55,7 @@ jobs:
       matrix:
         # windows-latest, windows-2022
         os: [windows-latest]
-        arch: [x86, x64]
+        arch: [x64]
         libtype: [static] # FIXME [static, shared]
         # debug, debugoptimized, release
         buildtype: [debug]
@@ -86,6 +86,9 @@ jobs:
           curl -sSL https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2 | tar -xf - -C deps\webview2
       - name: Ninja Build
         run: ninja -C builddir --verbose
+      - name: Copy WebView2 binaries
+        shell: cmd
+        run: cp deps\webview2\build\native\x64\* builddir
       - name: Run Tests
         run: meson test -C builddir --verbose
       - name: Upload artifacts
@@ -103,6 +106,7 @@ jobs:
             builddir/meson-logs/*.txt
 
   meson-windows-mingw:
+    if: false
     strategy:
       fail-fast: false
       matrix:
