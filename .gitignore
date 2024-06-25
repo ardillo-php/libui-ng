@@ -1,2 +1,7 @@
+*.dep
+*.lo
+*.la
+*.loT
+.libs
 subprojects/
 deps/
