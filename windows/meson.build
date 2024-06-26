@@ -80,7 +80,7 @@ if libui_mode == 'shared'
 endif
 
 # TODO prune this list
-foreach lib : ['user32', 'kernel32', 'gdi32', 'comctl32', 'uxtheme', 'msimg32', 'comdlg32', 'd2d1', 'dwrite', 'ole32', 'oleaut32', 'oleacc', 'uuid', 'windowscodecs', 'shlwapi']
+foreach lib : ['user32', 'kernel32', 'gdi32', 'comctl32', 'uxtheme', 'msimg32', 'comdlg32', 'd2d1', 'dwrite', 'ole32', 'oleaut32', 'oleacc', 'uuid', 'windowscodecs', 'shlwapi', 'advapi32']
 	libui_deps += [
 		meson.get_compiler('cpp').find_library(lib,
 			required: true),
@@ -90,3 +90,29 @@ endforeach
 if libui_OS == 'windows' and libui_mode == 'shared' and not libui_MSVC
 	error('Sorry, but libui for Windows can currently only be built as a static library with MinGW. You will need to either build as a static library or switch to MSVC.')
 endif
+
+py3 = import('python3').find_python()
+
+message('Downloading and extracting webview2 nuget package')
+
+arch = target_machine.cpu_family()
+if arch not in ['x86_64', 'aarch64']
+	error(f'Unexpected architecture @arch@')
+endif
+
+webview2_version = '1.0.2592.51'
+webview2_hash = '805c79e05184fab18c9fe7b8ba820c598399b97adc1fbf5b0ea490efad91d5b8'
+ret = run_command(py3, files('download-webview2.py'), webview2_version, webview2_hash, check: true)
+base_path = f'webview2-@webview2_version@' / 'build' / 'native'
+inc_dir = include_directories(base_path / 'include')
+lib_base_path = meson.current_source_dir() / base_path
+lib_path = ''
+if arch == 'x86_64'
+	lib_path = lib_base_path / 'x64'
+else
+	lib_path = lib_base_path / 'arm64'
+endif
+
+cc = meson.get_compiler('c')
+loader_static = cc.find_library('WebView2LoaderStatic', dirs: lib_path)
+libui_deps += declare_dependency(include_directories: inc_dir, dependencies: loader_static)

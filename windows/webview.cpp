@@ -1,19 +1,12 @@
-/*
-mkdir deps\webview2
-curl -sSL "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2" | tar -xf - -C deps\webview2
-*/
-
 #include "uipriv_windows.hpp"
-#include "deps/webview2/build/native/include/WebView2.h"
-#include "deps/webview2/build/native/include/WebView2EnvironmentOptions.h"
+#include "WebView2.h"
+#include "WebView2EnvironmentOptions.h"
 #include <wrl.h>
 #include <locale>
 #include <codecvt>
 #include <iostream>
 #include <future>
 #include <Shlwapi.h>
-
-#pragma comment(lib, "..\\deps\\webview2\\build\\native\\x64\\WebView2Loader.dll.lib")
 
 using namespace Microsoft::WRL;
 

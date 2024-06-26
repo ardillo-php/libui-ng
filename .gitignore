@@ -4,4 +4,4 @@
 *.loT
 .libs
 subprojects/
-deps/
+windows/webview2*
