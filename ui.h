@@ -4075,7 +4075,7 @@ _UI_EXTERN void uiFreeTableSelection(uiTableSelection* s);
 typedef struct uiWebViewParams uiWebViewParams;
 struct uiWebViewParams {
 	/**
-	 * Enables/disables developer tools in the WebView, if available
+	 * Enables/disables developer tools in the WebView
 	 */
 	int EnableDevTools;
 	/**
@@ -4086,6 +4086,10 @@ struct uiWebViewParams {
 	 * Comma separated list of custom URI schemes to be registered by the WebView
 	 */
 	char *CustomUriSchemes;
+	/**
+	 * Enables/disables whether the WebView is allowed to enter full screen mode
+	 */
+	int EnableFullScreen;
 };
 
 /**

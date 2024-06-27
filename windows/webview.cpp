@@ -297,5 +297,7 @@ uiWebView *uiNewWebView(uiWebViewParams *p)
 		}
 	}
 
+	w->settings->put_IsFullscreenAllowed(p->EnableFullScreen);
+
 	return w;
 }

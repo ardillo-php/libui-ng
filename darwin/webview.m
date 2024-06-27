@@ -122,6 +122,12 @@ uiWebView *uiNewWebView(uiWebViewParams *p)
 		free(schemes);
 	}
 
+	if (p->EnableFullScreen) {
+		[[w->config preferences] setValue:@YES forKey:@"fullScreenEnabled"];
+	} else {
+		[[w->config preferences] setValue:@NO forKey:@"fullScreenEnabled"];
+	}
+
 	w->webview = [[WKWebView alloc] initWithFrame:w->view.bounds configuration:w->config];
 	[w->view addSubview:w->webview];
 	[w->webview setTranslatesAutoresizingMaskIntoConstraints:NO];

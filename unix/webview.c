@@ -113,6 +113,8 @@ uiWebView *uiNewWebView(uiWebViewParams *p)
 		g_free(schemes);
 	}
 
+	webkit_settings_set_enable_fullscreen(settings, p->EnableFullScreen);
+
 	webkit_user_content_manager_register_script_message_handler(w->manager, "webview");
 	g_signal_connect(w->manager, "script-message-received::webview", G_CALLBACK(scriptMessageReceived), w);
 
