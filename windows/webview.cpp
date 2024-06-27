@@ -297,7 +297,11 @@ uiWebView *uiNewWebView(uiWebViewParams *p)
 		}
 	}
 
+	/*
+	Full screen support must be implemented at main window level, the prior implementation has deprecated.
+	See https://github.com/MicrosoftEdge/WebView2Samples/blob/a71b5c77deb6b52758b8e5bb769a5c3c81ca1824/SampleApps/WebView2APISample/AppWindow.cpp#L1603-L1632
 	w->settings->put_IsFullscreenAllowed(p->EnableFullScreen);
+	*/
 
 	return w;
 }
