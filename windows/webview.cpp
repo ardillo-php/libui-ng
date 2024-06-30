@@ -17,6 +17,7 @@ struct uiWebView {
 	ICoreWebView2Controller *controller;
 	ICoreWebView2 *webView;
 	ICoreWebView2Settings *settings;
+	std::vector<ICoreWebView2CustomSchemeRegistration*> registrations;
 	void (*onMessage)(uiWebView *w, const char *msg, void *data);
 	void *onMessageData;
 	void (*onRequest)(uiWebView *w, void *request, void *data);
@@ -156,6 +157,7 @@ uiWebView *uiNewWebView(uiWebViewParams *p)
 	HRESULT hr;
 	auto woptions = Make<CoreWebView2EnvironmentOptions>();
 	ComPtr<ICoreWebView2EnvironmentOptions4> woptions4;
+	std::vector<std::wstring> wideSchemes, wideSchemePatterns;
 
 	uiWindowsNewControl(uiWebView, w);
 
@@ -168,23 +170,25 @@ uiWebView *uiNewWebView(uiWebViewParams *p)
 	woptions.As(&woptions4);
 
 	if (p->CustomUriSchemes) {
-		char *schemes = _strdup(p->CustomUriSchemes);
-		char *scheme = strtok(schemes, ",");
+		std::string schemesStr = p->CustomUriSchemes;
+		std::istringstream schemesStream(schemesStr);
+		std::string scheme;
 
-		std::vector<ICoreWebView2CustomSchemeRegistration*> registrations;
+		while (getline(schemesStream, scheme, ',')) {
+			wideSchemes.push_back(converter.from_bytes(scheme));
 
-		while (scheme) {
+			std::string pattern = scheme + ":*";
+			wideSchemePatterns.push_back(converter.from_bytes(pattern));
+
 			auto reg = Make<CoreWebView2CustomSchemeRegistration>(converter.from_bytes(scheme).c_str());
 			reg->AddRef();
 			reg->put_HasAuthorityComponent(TRUE);
 			reg->put_TreatAsSecure(TRUE);
 
-			registrations.push_back(reg.Get());
-
-			scheme = strtok(NULL, ",");
+			w->registrations.push_back(reg.Get());
 		}
 
-		woptions4->SetCustomSchemeRegistrations(registrations.size(), registrations.data());
+		woptions4->SetCustomSchemeRegistrations(w->registrations.size(), w->registrations.data());
 	}
 
 	hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, woptions.Get(),
@@ -283,17 +287,8 @@ uiWebView *uiNewWebView(uiWebViewParams *p)
 	}
 
 	if (p->CustomUriSchemes) {
-		char *schemes = _strdup(p->CustomUriSchemes);
-		char *scheme = strtok(schemes, ",");
-
-		while (scheme) {
-			char *pattern = (char *)malloc(strlen(scheme) + 2);
-			strcpy(pattern, scheme);
-			strcat(pattern, ":*");
-
-			w->webView->AddWebResourceRequestedFilter(converter.from_bytes(pattern).c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
-
-			scheme = strtok(NULL, ",");
+		for (size_t i = 0; i < wideSchemePatterns.size(); i++) {
+			w->webView->AddWebResourceRequestedFilter(wideSchemePatterns[i].c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
 		}
 	}
 
